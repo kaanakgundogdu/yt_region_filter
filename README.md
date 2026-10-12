@@ -1,6 +1,6 @@
 # YT Region Filter
 
-A tiny Chrome extension (Manifest V3, plain JavaScript, no build step) that hides **off-context Turkish recommendations** on YouTube's watch page: the "Up next" sidebar, the end-screen grid, and autoplay.
+A tiny Chrome extension (Manifest V3, plain JavaScript, no build step) that hides **off-context Turkish recommendations** on YouTube's watch page: the "Up next" sidebar, the fullscreen and end-screen suggestion grids, and autoplay.
 
 ## Why
 
@@ -8,7 +8,7 @@ YouTube's recommendation engine leans heavily on your **IP location**, not on yo
 
 Recommendations *related* to the video are useful, so this extension doesn't blanket-ban a language. Instead it:
 
-- **hides Turkish cards in the sidebar and in the end-screen grid** when the video you're watching is **not** Turkish;
+- **hides Turkish cards in the sidebar, the fullscreen suggestion grid and the end screen** when the video you're watching is **not** Turkish;
 - **cancels autoplay** when the "Up next" video is Turkish and off-context, so it doesn't start on its own;
 - **leaves everything alone** when you're watching a Turkish video (context rule);
 - **sees through auto-translated titles**: YouTube now translates titles into your UI language, so a Turkish video can show up as *"Veteran Journalist Calls for Early Elections!…"*. The extension looks up the original title and catches it anyway.
@@ -77,7 +77,7 @@ chrome --headless=new --user-data-dir=/tmp/ytrf --dump-dom file:///path/to/yt_re
 - Turkish titles with no Turkish-specific letters and at most one common word can slip through.
 - Short English titles containing a Turkish name and fewer than two English stopwords may be hidden.
 - A translated Turkish card can be visible for a moment until its original title arrives.
-- Only the watch page is filtered (sidebar, end screen, autoplay). The homepage, Shorts and search are not.
+- Only the watch page is filtered (sidebar, fullscreen grid, end screen, autoplay). The homepage, Shorts and search are not.
 - A Turkish autoplay is cancelled, not replaced; pick the next video from the end screen.
 - Turkish is the only target language for now.
 

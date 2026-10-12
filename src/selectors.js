@@ -14,8 +14,10 @@
     // Title of the video being watched.
     watchTitle: 'ytd-watch-metadata h1 yt-formatted-string, ytd-watch-metadata h1',
 
-    // End screen grid shown when a video ends (verified 2026-10-12: modern + legacy class names).
-    // Elements are pre-rendered inside the player and recycled (href/text change in place).
+    // Player suggestion tiles (verified 2026-10-12), pre-rendered and recycled (href/text change in place):
+    //  - .ytp-fullscreen-grid: the suggestions grid opened while watching in fullscreen and shown at
+    //    the end of the video (modern tiles, CSS grid, so hidden tiles reflow);
+    //  - .ytp-endscreen-content: legacy end-screen wall (absolutely positioned, hidden tiles leave gaps).
     endscreenStill: '#movie_player .ytp-modern-videowall-still, #movie_player .ytp-videowall-still',
 
     // Autoplay "Up next" countdown overlay and its cancel button.

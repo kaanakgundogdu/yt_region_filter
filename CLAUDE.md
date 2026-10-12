@@ -112,7 +112,7 @@ isTurkish(title: string, threshold = 0.5) -> boolean   // turkishScore(title) >=
 - `selectors.js` exports: `cardTitle`, `cardChannel`, `cardVideoId`, `currentVideoId`, `watchTitle`, `stillTitle`, `stillVideoId`, `upnextTitle`, `upnextVideoId`.
 
 ### End screen
-- Grid tiles: `#movie_player .ytp-modern-videowall-still` (legacy `.ytp-videowall-still`), an `<a>` whose `href` holds the video id; title in `.ytp-modern-videowall-still-info-title`. Hidden/dimmed exactly like sidebar cards and counted in `hiddenCount`.
+- Grid tiles: `#movie_player .ytp-modern-videowall-still` (legacy `.ytp-videowall-still`). The same modern tiles make up `.ytp-fullscreen-grid`, the suggestion grid you can open while watching in **fullscreen**, so one selector covers both. Each tile is an `<a>` whose `href` holds the video id; title in `.ytp-modern-videowall-still-info-title`. Hidden/dimmed exactly like sidebar cards and counted in `hiddenCount`.
 - Autoplay: `.ytp-autonav-endscreen-upnext-container` (title `.ytp-autonav-endscreen-upnext-title`, link `a.ytp-autonav-endscreen-link-container`). The overlay is pre-rendered while the video plays, so it is judged early (warms the oEmbed cache), but `.ytp-autonav-endscreen-upnext-cancel-button` is clicked only when the overlay is visible.
 
 ### File ownership
@@ -167,6 +167,7 @@ Agent rules: write only your own files; if another file needs a change, don't ma
    `"C:\Program Files\Google\Chrome\Application\chrome.exe" --headless=new --user-data-dir=<temp dir> --dump-dom file:///D:/development/yt_region_filter/tests/detect.test.html` → look for `ALL PASSED`.
 
 **Known limitations (watch during K7):**
+- In the legacy end-screen wall (absolutely positioned tiles) hidden tiles leave gaps; the modern fullscreen/end grid reflows.
 - Turkish autoplay is cancelled rather than skipped to the next non-Turkish video; you pick the next video from the (filtered) end screen.
 - Turkish titles with no special characters and only one stopword (e.g. "bugün hava çok güzel" = 0.35) slip through.
 - Short English titles with a Turkish name and fewer than 2 English stopwords ("Erdoğan meets Biden in Washington") still count as Turkish.
@@ -181,5 +182,6 @@ Agent rules: write only your own files; if another file needs a change, don't ma
 - [ ] Video-to-video (SPA) navigation updates the context; no stale decisions.
 - [ ] Turning the filter off in the popup restores all cards.
 - [ ] End screen: Turkish tiles hidden after an English video ends.
+- [ ] Fullscreen: Turkish tiles hidden in the suggestion grid opened during fullscreen playback.
 - [ ] Autoplay: a Turkish "Up next" countdown is cancelled; an English one still autoplays.
 - [x] Debug mode shows a score label on each card.
