@@ -73,10 +73,23 @@
     return { tr: false, score: shown, src: '' };
   }
 
-  function scan() {
+  // Every element we filter: sidebar cards and end-screen tiles, with how to read their title/id.
+  function targets() {
+    const out = [];
     const sidebar = document.querySelector(sel.S.sidebar);
-    if (location.pathname !== '/watch' || !sidebar || !settings.enabled) {
-      if (sidebar && !settings.enabled) clearAll(sidebar);
+    if (sidebar) {
+      for (const el of sidebar.querySelectorAll(sel.S.card)) out.push([el, sel.cardTitle(el), sel.cardVideoId(el)]);
+    }
+    for (const el of document.querySelectorAll(sel.S.endscreenStill)) {
+      out.push([el, sel.stillTitle(el), sel.stillVideoId(el)]);
+    }
+    return out;
+  }
+
+  function scan() {
+    if (location.pathname !== '/watch') return;
+    if (!settings.enabled) {
+      clearAll();
       return;
     }
 
@@ -87,22 +100,24 @@
     const contextTr = ctx.tr;
     let count = 0;
 
-    for (const card of sidebar.querySelectorAll(sel.S.card)) {
+    for (const [el, title, id] of targets()) {
       // YouTube recycles nodes, so re-apply the decision on every scan (results are cached).
-      const { tr, score, src } = judge(sel.cardTitle(card), sel.cardVideoId(card));
+      const { tr, score, src } = judge(title, id);
       const filter = tr && !contextTr;
 
-      card.classList.remove(...CLASSES);
+      el.classList.remove(...CLASSES);
       if (filter) {
-        card.classList.add(settings.mode === 'dim' ? 'ytrf-dim' : 'ytrf-hidden');
+        el.classList.add(settings.mode === 'dim' ? 'ytrf-dim' : 'ytrf-hidden');
         count++;
       }
       if (settings.debug) {
-        card.classList.add('ytrf-debug');
-        card.dataset.ytrfTr = tr ? '1' : '0';
-        card.dataset.ytrfLabel = `${score.toFixed(2)}${src}${filter ? ' hidden' : ''}${contextTr ? ' (context TR)' : ''}`;
+        el.classList.add('ytrf-debug');
+        el.dataset.ytrfTr = tr ? '1' : '0';
+        el.dataset.ytrfLabel = `${score.toFixed(2)}${src}${filter ? ' hidden' : ''}${contextTr ? ' (context TR)' : ''}`;
       }
     }
+
+    checkAutoplay(contextTr);
 
     if (count !== lastCount) {
       lastCount = count;
@@ -112,9 +127,27 @@
     }
   }
 
-  function clearAll(sidebar) {
+  // Hiding the "Up next" overlay wouldn't stop autoplay, so cancel the countdown instead.
+  // The overlay is pre-rendered while the video plays; judging it early warms the oEmbed cache,
+  // but we only click Cancel once it is actually visible (i.e. the countdown is running).
+  let cancelledFor = '';
+  function checkAutoplay(contextTr) {
+    const upnext = document.querySelector(sel.S.upnext);
+    if (!upnext) return;
+    const id = sel.upnextVideoId(upnext);
+    if (!id || id === cancelledFor) return;
+    const { tr } = judge(sel.upnextTitle(upnext), id);
+    if (!tr || contextTr || upnext.getClientRects().length === 0) return;
+    const cancel = document.querySelector(sel.S.upnextCancel);
+    if (!cancel) return;
+    cancel.click();
+    cancelledFor = id;
+    log('autoplay cancelled:', sel.upnextTitle(upnext));
+  }
+
+  function clearAll() {
     clearTimeout(countTimer);
-    for (const card of sidebar.querySelectorAll(sel.S.card)) card.classList.remove(...CLASSES);
+    for (const [el] of targets()) el.classList.remove(...CLASSES);
     if (lastCount !== 0) {
       lastCount = 0;
       chrome.storage.local.set({ hiddenCount: 0 });
@@ -126,14 +159,21 @@
     scanTimer = setTimeout(scan, 100);
   }
 
-  // Infinite scroll, lazy loading, and title changes on recycled nodes.
-  // Only the 'title' attribute is watched, so our own class/data changes don't cause a loop.
+  // Infinite scroll, lazy loading, and changes on recycled nodes. Only 'title' (sidebar cards)
+  // and 'href' (end-screen tiles) are watched, so our own class/data changes don't cause a loop.
   new MutationObserver(schedule).observe(document.body, {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ['title'],
+    attributeFilter: ['title', 'href'],
   });
+
+  // The end screen and autoplay countdown appear when the video ends; media events don't
+  // bubble, so listen in the capture phase. Rescan again shortly after, once the overlay is shown.
+  document.addEventListener('ended', () => {
+    schedule();
+    setTimeout(schedule, 600);
+  }, true);
 
   // SPA navigation: reset the counter and recompute the context.
   document.addEventListener('yt-navigate-finish', () => {

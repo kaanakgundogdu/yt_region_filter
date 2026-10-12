@@ -13,6 +13,14 @@
 
     // Title of the video being watched.
     watchTitle: 'ytd-watch-metadata h1 yt-formatted-string, ytd-watch-metadata h1',
+
+    // End screen grid shown when a video ends (verified 2026-10-12: modern + legacy class names).
+    // Elements are pre-rendered inside the player and recycled (href/text change in place).
+    endscreenStill: '#movie_player .ytp-modern-videowall-still, #movie_player .ytp-videowall-still',
+
+    // Autoplay "Up next" countdown overlay and its cancel button.
+    upnext: '#movie_player .ytp-autonav-endscreen-upnext-container',
+    upnextCancel: '#movie_player .ytp-autonav-endscreen-upnext-cancel-button',
   };
 
   // Full title: the title attribute holds the untruncated text (the visible text is clipped with "…").
@@ -43,6 +51,31 @@
     return h ? h[1] : '';
   }
 
+  function idFromHref(el) {
+    const href = el && el.getAttribute('href');
+    const m = href && href.match(/[?&]v=([\w-]{11})/);
+    return m ? m[1] : '';
+  }
+
+  // End screen tile: the <a> itself carries the watch link.
+  function stillTitle(still) {
+    const el = still.querySelector('.ytp-modern-videowall-still-info-title, .ytp-videowall-still-info-title');
+    return el ? el.textContent.trim() : '';
+  }
+
+  function stillVideoId(still) {
+    return idFromHref(still);
+  }
+
+  function upnextTitle(upnext) {
+    const el = upnext.querySelector('.ytp-autonav-endscreen-upnext-title');
+    return el ? el.textContent.trim() : '';
+  }
+
+  function upnextVideoId(upnext) {
+    return idFromHref(upnext.querySelector('a.ytp-autonav-endscreen-link-container'));
+  }
+
   function currentVideoId() {
     return new URLSearchParams(location.search).get('v') || '';
   }
@@ -55,5 +88,8 @@
   }
 
   globalThis.YTRF = globalThis.YTRF || {};
-  YTRF.sel = { S, cardTitle, cardChannel, cardVideoId, currentVideoId, watchTitle };
+  YTRF.sel = {
+    S, cardTitle, cardChannel, cardVideoId, currentVideoId, watchTitle,
+    stillTitle, stillVideoId, upnextTitle, upnextVideoId,
+  };
 })();
