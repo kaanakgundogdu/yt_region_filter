@@ -93,3 +93,7 @@ tests/
   detect.test.html browser-based unit tests for detect.js
 CLAUDE.md          design notes, contracts and working rules
 ```
+
+## License
+
+[MIT](LICENSE)
