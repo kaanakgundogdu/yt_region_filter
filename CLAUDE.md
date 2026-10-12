@@ -51,6 +51,7 @@ Detection is a cheap synchronous heuristic: **Turkish-specific characters** (`ı
 | YouTube **auto-translates** Turkish titles into the UI language, with no DOM marker. | Fetch the original title from same-origin `/oembed` when the shown title isn't Turkish. |
 | Short or mixed-language titles get misdetected. | Score + threshold; debug mode dims instead of hiding and shows the score for tuning. |
 | Removing elements can break YouTube's own code. | Elements are **never removed**, only hidden via a CSS class. |
+| After the extension is reloaded, the copy already injected into open tabs keeps running without extension APIs (`chrome.storage` is undefined → "Cannot read properties of undefined"). | `alive()` checks `chrome.runtime.id` before each scan and storage write; an orphaned copy disconnects its observer and listeners and logs a one-line hint to reload the tab. |
 
 ## Folder layout
 ```

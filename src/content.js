@@ -19,6 +19,29 @@
 
   const log = (...a) => settings.debug && console.log('[ytrf]', ...a);
 
+  // When the extension is reloaded or updated, the copy already injected into open tabs keeps
+  // running but loses its extension APIs (chrome.storage becomes undefined). Detect that and shut
+  // this copy down; the tab gets a fresh one on its next reload.
+  let observer = null;
+  let dead = false;
+  const alive = () => !!(globalThis.chrome && chrome.runtime && chrome.runtime.id);
+
+  function shutdown() {
+    if (dead) return;
+    dead = true;
+    clearTimeout(scanTimer);
+    clearTimeout(countTimer);
+    if (observer) observer.disconnect();
+    document.removeEventListener('ended', onEnded, true);
+    document.removeEventListener('yt-navigate-finish', onNavigate);
+    console.info('[ytrf] extension was reloaded; reload this tab to re-enable filtering');
+  }
+
+  function saveCount(n) {
+    if (!alive()) return shutdown();
+    chrome.storage.local.set({ hiddenCount: n });
+  }
+
   // --- Original title (oEmbed) ---
   // YouTube may auto-translate Turkish titles and leaves no marker in the DOM.
   // The same-origin /oembed endpoint returns the original title; no extra permission needed.
@@ -123,7 +146,7 @@
       lastCount = count;
       log('hidden:', count, 'context TR:', contextTr);
       clearTimeout(countTimer);
-      countTimer = setTimeout(() => chrome.storage.local.set({ hiddenCount: count }), 500);
+      countTimer = setTimeout(() => saveCount(count), 500);
     }
   }
 
@@ -150,18 +173,19 @@
     for (const [el] of targets()) el.classList.remove(...CLASSES);
     if (lastCount !== 0) {
       lastCount = 0;
-      chrome.storage.local.set({ hiddenCount: 0 });
+      saveCount(0);
     }
   }
 
   function schedule() {
     clearTimeout(scanTimer);
-    scanTimer = setTimeout(scan, 100);
+    scanTimer = setTimeout(() => (alive() ? scan() : shutdown()), 100);
   }
 
   // Infinite scroll, lazy loading, and changes on recycled nodes. Only 'title' (sidebar cards)
   // and 'href' (end-screen tiles) are watched, so our own class/data changes don't cause a loop.
-  new MutationObserver(schedule).observe(document.body, {
+  observer = new MutationObserver(schedule);
+  observer.observe(document.body, {
     childList: true,
     subtree: true,
     attributes: true,
@@ -170,16 +194,18 @@
 
   // The end screen and autoplay countdown appear when the video ends; media events don't
   // bubble, so listen in the capture phase. Rescan again shortly after, once the overlay is shown.
-  document.addEventListener('ended', () => {
+  function onEnded() {
     schedule();
     setTimeout(schedule, 600);
-  }, true);
+  }
+  document.addEventListener('ended', onEnded, true);
 
   // SPA navigation: reset the counter and recompute the context.
-  document.addEventListener('yt-navigate-finish', () => {
+  function onNavigate() {
     lastCount = -1;
     schedule();
-  });
+  }
+  document.addEventListener('yt-navigate-finish', onNavigate);
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync') return;
