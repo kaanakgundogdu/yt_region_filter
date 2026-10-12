@@ -1,8 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <!-- Red octagon (stop-sign shape, like ad blockers) with a white "RB" (Region Block) -->
-  <polygon points="37.5,4 90.5,4 124,37.5 124,90.5 90.5,124 37.5,124 4,90.5 4,37.5"
-           fill="#d32f2f" stroke="#ffffff" stroke-width="6" stroke-linejoin="round"/>
-  <text x="64" y="66" text-anchor="middle" dominant-baseline="central"
-        font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900"
-        font-size="58" letter-spacing="-2" fill="#ffffff">RB</text>
+  <!-- "No region": a location pin crossed out by a slash, on a rounded indigo tile -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b3f9e"/>
+      <stop offset="1" stop-color="#23255c"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#bg)"/>
+  <!-- Location pin with a round hole -->
+  <path fill="#ffffff" fill-rule="evenodd"
+        d="M64 112 C64 112 30 78 30 52 A34 34 0 0 1 98 52 C98 78 64 112 64 112 Z
+           M64 39 A13 13 0 1 0 64 65 A13 13 0 1 0 64 39 Z"/>
+  <!-- Slash: a dark gap first so it reads as cutting through the pin -->
+  <line x1="28" y1="100" x2="100" y2="28" stroke="#2c2f78" stroke-width="22" stroke-linecap="round"/>
+  <line x1="28" y1="100" x2="100" y2="28" stroke="#ff6b57" stroke-width="11" stroke-linecap="round"/>
 </svg>

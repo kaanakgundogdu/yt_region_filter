@@ -91,7 +91,7 @@ src/
   popup/           toolbar popup (HTML/CSS/JS)
 tests/
   detect.test.html browser-based unit tests for detect.js
-icons/             toolbar icons (icon.svg source + 16/32/48/128 PNGs)
+icons/             toolbar icons ("no region" pin; icon.svg source + 16/32/48/128 PNGs)
 CLAUDE.md          design notes, contracts and working rules
 ```
 
