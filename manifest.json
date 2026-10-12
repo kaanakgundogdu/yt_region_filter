@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "YT Region Filter",
+  "version": "0.1.0",
+  "description": "Hides off-context Turkish (regional) recommendations in the YouTube watch-page sidebar.",
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "YT Region Filter"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["src/selectors.js", "src/detect.js", "src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

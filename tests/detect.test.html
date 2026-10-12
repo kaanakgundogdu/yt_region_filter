@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>detect.js tests</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 24px; }
+  #summary { font-weight: bold; padding: 8px 12px; border-radius: 4px; color: #fff; }
+  #summary.ok { background: #1a7f37; }
+  #summary.bad { background: #cf222e; }
+  ul { list-style: none; padding: 0; }
+  li { padding: 3px 0; font-family: monospace; }
+  li.pass .tag { color: #1a7f37; }
+  li.fail .tag { color: #cf222e; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>detect.js tests</h1>
+<div id="summary">Running...</div>
+<ul id="results"></ul>
+<script src="../src/detect.js"></script>
+<script>
+(function () {
+  const results = [];
+  const { turkishScore, isTurkish } = globalThis.YTRF.detect;
+
+  function record(name, ok, detail) { results.push({ name, ok, detail }); }
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+
+  // [name, input, expected isTurkish, expected score (null = do not check)]
+  const cases = [
+    // Reference card (all caps, İ Ş Ğ): 6 strong -> 85 + ilk/kez 50 -> 1.0
+    ['reference card', "TÜRKİYE'NİN KONUŞTUĞU TEĞMENLER İLK KEZ ...", true, 1],
+    ['reference card, truncated (…)', "TÜRKİYE'NİN KONUŞTUĞU TEĞMENLER İLK KEZ …", true, 1],
+    ['uppercase, single İ', 'İSTANBUL', true, 0.75],
+    ['uppercase, Ş and Ğ', 'ŞAMPİYONLUK YOLUNDA DEV BİR ADIM', true, 1],
+    ['lowercase Turkish', 'güzel bir gün, çok sıcak', true, 1],
+    ['two strong chars (Ş, ı)', 'Şarkı', true, 0.8],
+    // No special chars: 3 definite stopwords (neden, bu, kadar) = 0.75
+    ['no special chars, stopwords', 'Neden bu kadar pahali', true, 0.75],
+    // çok(25) + bu(25) + weak ç(10) = 0.6
+    ['weak char + 2 stopwords', 'Bu video çok iyi', true, 0.6],
+    ['emoji does not affect score', '🔥 Bu video çok iyi 😂', true, 0.6],
+    // Known limit: no strong char, 1 stopword + weak = 0.35
+    ['known limit: 1 stopword + ç/ü', 'bugün hava çok güzel', false, 0.35],
+
+    // Real-world examples
+    ['REİS YA-PA-MA-DI', 'REİS YA-PA-MA-DI', true, 0.75],
+    ['Türkiye Neden Kore Olamadı...', 'Türkiye Neden Kore Olamadı? - Olmaz Öyle Saçma Siyaset - Ömer Gemalmaz - B11', true, null],
+    ['DÜNYANIN EN İYİ OYUNU...', 'DÜNYANIN EN İYİ OYUNU VE İNANILMAZ GRAFİKLERİ!', true, null],
+    // Single proper name (Erdoğan) in an English sentence: 20 points -> false
+    ['English + Erdoğan', "Even Erdoğan knows: this isn't just an economic blaze. The system is in an unavoidable death spiral.", false, 0.2],
+    // Only 1 English stopword ("in") -> the exception does not apply, stays 0.75 true (accepted limit)
+    ['Erdoğan meets Biden in Washington', 'Erdoğan meets Biden in Washington', true, 0.75],
+
+    // English
+    ['English 1', "HELL'S MEMORIES SANJI IS HERE!!! | One Piece Chapter 1195 Review", false, 0],
+    ['English 2', 'The Cruel Irony Of Zeke Yeager', false, 0],
+    ['English 3', 'The Dark Continent Explained in 19 Minutes', false, 0],
+
+    // German / French: weak chars only -> 0.1
+    ['German 1', 'Schöne Grüße aus München', false, 0.1],
+    ['French', 'Ça va être génial', false, 0.1],
+    ['German 2', 'Über die Brücke', false, 0.1],
+    ['French ambiguous words', 'Ne pas en parler', false, 0.2],
+
+    // Edge cases
+    ['empty string', '', false, 0],
+    ['whitespace/punctuation only', ' ... !!! ', false, 0],
+    ['emoji only', '🔥🔥😂', false, 0],
+    ['digits only', '1195 2024 42', false, 0],
+  ];
+
+  for (const [name, input, expectBool, expectScore] of cases) {
+    const score = turkishScore(input);
+    const bool = isTurkish(input);
+    record(name + ' -> isTurkish=' + expectBool, bool === expectBool, 'score=' + score);
+    if (expectScore !== null) {
+      record(name + ' -> skor=' + expectScore, near(score, expectScore), 'score=' + score);
+    }
+  }
+
+  // Invalid input types
+  for (const [label, v] of [['null', null], ['undefined', undefined], ['number', 42], ['object', {}], ['array', ['İ']]]) {
+    record('invalid input (' + label + ') -> 0', turkishScore(v) === 0 && isTurkish(v) === false, 'score=' + turkishScore(v));
+  }
+
+  // Determinism and cache
+  const sample = "TÜRKİYE'NİN KONUŞTUĞU TEĞMENLER İLK KEZ ...";
+  record('determinism (same input, same score)', turkishScore(sample) === turkishScore(sample), '');
+  const before = turkishScore('Neden bu kadar pahali');
+  for (let i = 0; i < 2500; i++) turkishScore('filler title ' + i); // exceed the cache limit
+  record('same score after cache clear', turkishScore('Neden bu kadar pahali') === before, '');
+
+  // Custom threshold
+  record('threshold 0.9: score 0.75 is false', isTurkish('İSTANBUL', 0.9) === false, '');
+  record('threshold 0.75: score 0.75 is true (>=)', isTurkish('İSTANBUL', 0.75) === true, '');
+  record('threshold 0.05: German is true', isTurkish('Über die Brücke', 0.05) === true, '');
+  record('threshold 0: empty string is true (0 >= 0)', isTurkish('', 0) === true, '');
+
+  // Score range
+  record('score within 0..1', cases.every(c => { const s = turkishScore(c[1]); return s >= 0 && s <= 1; }), '');
+
+  // Render
+  const list = document.getElementById('results');
+  let failed = 0;
+  for (const r of results) {
+    if (!r.ok) failed++;
+    const li = document.createElement('li');
+    li.className = r.ok ? 'pass' : 'fail';
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = r.ok ? 'PASS' : 'FAIL';
+    li.appendChild(tag);
+    li.appendChild(document.createTextNode(' ' + r.name + (r.detail ? ' (' + r.detail + ')' : '')));
+    list.appendChild(li);
+  }
+  const summary = document.getElementById('summary');
+  const text = failed === 0
+    ? 'ALL PASSED: ' + results.length + '/' + results.length
+    : failed + ' FAILED / ' + results.length + ' tests';
+  summary.textContent = text;
+  summary.className = failed === 0 ? 'ok' : 'bad';
+  console.log('[ytrf-test] ' + text);
+  for (const r of results) if (!r.ok) console.error('[ytrf-test] FAIL: ' + r.name + ' ' + r.detail);
+})();
+</script>
+</body>
+</html>

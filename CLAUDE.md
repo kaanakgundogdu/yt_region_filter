@@ -1,156 +1,174 @@
 # YT Region Filter: Chrome Extension (Manifest V3)
 
-YouTube izleme sayfasındaki "sıradaki / önerilen" listesinde, izlenen videoyla ilgisi olmayan **bölgesel (Türkçe) önerileri** gizleyen küçük bir pilot extension. Düz JS kullanılır; framework, bundler ve build adımı yoktur.
+A small pilot extension that hides **regional (Turkish) recommendations** that are unrelated to the video being watched in YouTube's watch-page "up next" sidebar. Plain JS only: no framework, no bundler, no build step.
 
-## Problem tanımı (netleştirilmiş)
-- Ana sayfa önerileri zaten kapalı. Sorun **izleme sayfasının sağ panelinde** (ve video sonu ekranında) çıkan Türkiye kaynaklı (çoğunlukla siyasi) videolar.
-- Videoyla ilgili öneriler faydalı, bunlar kalmalı. Yalnızca **bağlam dışı bölgesel** öneriler gitmeli.
+## Problem statement
+- Homepage recommendations are already turned off (watch history off). The problem is Turkey-sourced, mostly political, videos in the **watch-page sidebar**.
+- Recommendations related to the current video are useful and must stay. Only **off-context regional** ones should go.
 
-## Onaylanan kararlar (2026-10-12)
-1. **Yaklaşım:** Uyarlanmış B uygulanacak, A elendi. Hesabın bölgesi zaten AU olduğu hâlde Türkçe öneriler geliyor. Bu da sinyalin gl değil IP/hesap kaynaklı olduğunu doğruluyor.
-2. **Kapsam:** Pilotta yalnızca izleme sayfasının sağ paneli (dar ekranda video altına düşen aynı liste) filtrelenir. Video sonu ekranı ve Shorts pilot sonrasına bırakıldı (DUR-6).
-3. **Bağlam kuralı:** Açık. İzlenen video Türkçeyse Türkçe öneriler gösterilir.
-4. **Mod:** Varsayılan **gizle**. Geliştirme sırasında debug modu (soluklaştırma + dil etiketi) açık olur. DUR-4'te kapatılır.
-5. **Hedef dil:** Yalnızca Türkçe. Kanal beyaz listesi pilotta yok.
-6. **Popup:** Minimal tutulur (açık/kapalı, mod, gizlenen sayısı). K6 kartında yapılır.
-7. **DOM inceleme:** Claude, yerleşik tarayıcıda oturum açmadan YouTube izleme sayfasını inceler (kart yapısı hesaptan bağımsızdır). Bu yeterli olmazsa kullanıcıdan `outerHTML` istenir.
-8. **Git:** Depo `git init` ile başlatıldı.
+## Decisions (approved 2026-10-12)
+1. **Approach:** Adapted B (see below); A is dropped. The account region is already set to a non-Turkish country and Turkish suggestions still appear, which confirms the signal comes from IP/account, not `gl`.
+2. **Scope:** Pilot filters only the watch-page sidebar (the same list that moves below the video on narrow layouts). End screen and Shorts are deferred (STOP-6).
+3. **Context rule:** On. If the current video is Turkish, Turkish suggestions are shown.
+4. **Mode:** Default **hide**. Debug mode (dim + score label) is for development and tuning.
+5. **Target language:** Turkish only. No channel allowlist in the pilot.
+6. **Popup:** Minimal (on/off, mode, hidden count).
+7. **DOM inspection:** Claude inspects the watch page in the built-in browser, logged out (card structure doesn't depend on the account). If that's insufficient, ask the user for a card's `outerHTML`.
+8. **Language:** All repo content (code comments, docs, UI strings, logs) is in English.
 
-**Referans örnek (kullanıcı ekran görüntüsü):** İngilizce *"One Piece Chapter 1195 Review"* videosu izlenirken sağ panelde *"TÜRKİYE'NİN KONUŞTUĞU TEĞMENLER İLK KEZ ..."* (kanal: Onlar) çıkıyor. Bu kart gizlenmeli. Aynı paneldeki İngilizce anime ve manga önerileri kalmalı.
-- Başlık **tamamen büyük harf** ve `İ`, `Ğ` içeriyor. Karakter sezgisi büyük harfleri doğrudan regex ile yakalamalı (`/[ıİğĞşŞ]/`). `toLowerCase()` kullanılmamalı, çünkü `İ` → `i̇` (birleşik nokta) olur.
-- Başlık "…" ile kesilmiş olabilir. Mümkünse `title` / `aria-label` özniteliğindeki tam başlık kullanılır.
+**Reference case (user screenshot):** While watching the English *"One Piece Chapter 1195 Review"*, the sidebar shows *"TÜRKİYE'NİN KONUŞTUĞU TEĞMENLER İLK KEZ ..."*. That card must be hidden; the English anime/manga suggestions in the same list must stay.
+- The title is **all caps** with `İ`, `Ğ`. Detect special characters on the raw string by regex (`/[ıİğĞşŞ]/`); never `toLowerCase()` first, since `İ` becomes `i̇` (combining dot).
+- The visible title may be clipped with "…". Use the full title from the `title` attribute.
 
-**Not edilen alternatif C:** Panelin üstündeki YouTube'un kendi **"Related"** çipini otomatik seçmek. Basit görünüyor ama bölgesel önerileri garanti biçimde dışlamıyor ve çip DOM'u da kırılgan. Pilotta yok, K7 sonrası tekrar değerlendirilebilir.
+## Approach
 
-## Seçilen yaklaşım: B'nin uyarlanmış hâli (A elendi)
+**A) Forcing `gl`/`hl` (URL / PREF cookie): DROPPED.**
+- The region setting already lives in the PREF cookie and didn't help. Recommendations are driven mostly by **IP location and account signals**; `gl` mainly affects trending and UI locale.
+- Watch-next results come from `youtubei/v1/next` with `context.client.gl` in the JSON body. Changing it needs fetch/XHR injection in the MAIN world: fragile, invasive, uncertain payoff (IP still dominates).
+- URL redirects (declarativeNetRequest) don't fire on SPA navigation and risk redirect loops.
 
-**A) gl/hl zorlama (URL / PREF cookie): ELENDİ.**
-- Kullanıcı bölgeyi zaten değiştirdi; PREF cookie'si bu ayarı zaten taşıyor ve sorun çözülmedi. Öneri motoru ağırlıklı olarak **IP konumu ve hesap sinyallerini** kullanıyor. gl daha çok trend sayfası ve arayüz dilini etkiliyor.
-- İzleme önerileri `youtubei/v1/next` isteğinin JSON gövdesindeki `context.client.gl` ile geliyor. Bunu değiştirmek fetch/XHR enjeksiyonu (MAIN world) gerektirir. Bu kırılgan ve invaziv, etkisi de belirsiz (IP yine baskın).
-- URL yönlendirmesi (declarativeNetRequest) SPA gezinmesinde devreye girmez ve yönlendirme döngüsü riski taşır.
+**B) Card-title language detection + hiding: CHOSEN, with two changes:**
+1. **Target the watch page, not the homepage** (homepage is already off).
+2. **Context rule:** if the current video's title is also Turkish, Turkish suggestions are **not** hidden, so "related suggestions are useful" holds.
 
-**B) Kart başlığı dil tespiti + gizleme: SEÇİLDİ, iki değişiklikle:**
-1. **Hedef ana sayfa değil, izleme sayfası** (sağ panel, gerekirse video sonu ekranı). Ana sayfa zaten kapalı.
-2. **Bağlam kuralı:** İzlenen videonun başlığı da hedef dildeyse (Türkçe bir video izleniyorsa) Türkçe öneriler **gizlenmez**. Böylece "ilgili öneri faydalı" şartı korunur.
+Detection is a cheap synchronous heuristic: **Turkish-specific characters** (`ı İ ğ Ğ ş Ş`) plus a small Turkish stopword list. `chrome.i18n.detectLanguage` (CLD) is unreliable on short titles and async, so it isn't used.
 
-Dil tespiti iki katmanlıdır:
-- `chrome.i18n.detectLanguage` (CLD), content script içinde izin gerektirmeden kullanılabilir.
-- Kısa başlıklarda CLD güvenilmez. Bu yüzden ucuz bir yedek kullanılır: **Türkçeye özgü karakterler** (`ı İ ğ Ğ ş Ş`) ve isteğe bağlı küçük bir Türkçe stopword listesi (`ve, bir, için, neden, nasıl...`). Sonuçlar başlık metnine göre önbelleğe alınır.
+**A + B combined:** Not worth it. A's benefit is uncertain and its risk high. If B proves insufficient, A becomes a separate experiment (K8).
 
-**A+B birleşimi:** Mantıklı değil. A'nın getirisi belirsiz, riski yüksek. Pilot bittikten sonra, B yetersiz kalırsa A ayrı bir deney kartı olarak değerlendirilir (bkz. K8).
+**Alternatives noted (out of pilot scope):**
+- Intercept `ytInitialData` / `youtubei/v1/next` in the MAIN world and filter items before render. More robust to CSS changes but fragile to schema changes and more invasive.
+- Auto-select YouTube's own **"Related"** chip above the sidebar. Doesn't guarantee excluding regional items and the chip DOM is fragile.
 
-**Not edilen alternatif (pilot dışı):** `ytInitialData` / `youtubei/v1/next` yanıtını MAIN world'de yakalayıp öğeleri render edilmeden önce filtrelemek. CSS değişikliklerine daha dayanıklı ama veri şeması değişikliklerine karşı kırılgan ve daha invaziv. Ancak DOM yaklaşımı sürdürülemez hâle gelirse düşünülür.
-
-## Kırılgan noktalar ve önlemler
-| Risk | Önlem |
+## Fragile points and mitigations
+| Risk | Mitigation |
 |---|---|
-| YouTube DOM'u sık değişiyor. Sağ panel `ytd-compact-video-renderer` yapısından yeni `yt-lockup-view-model` yapısına geçti. İkisi bir arada görülebilir. | Tüm seçiciler **tek dosyada** (`selectors.js`) tutulur ve her iki yapı da desteklenir. Seçici bozulursa sadece bu dosya düzeltilir. |
-| SPA gezinmesi: sayfa yeniden yüklenmez. | `yt-navigate-finish` olayı dinlenir ve bağlam (izlenen video dili) yeniden hesaplanır. |
-| YouTube kart DOM düğümlerini **yeniden kullanır** (başlık değişir, element aynı kalır). | Karar `data-ytrf-title` ile hangi başlık için verildiyse işaretlenir. Başlık değişince yeniden değerlendirilir. |
-| Sonsuz kaydırma / gecikmeli yükleme | Panel kapsayıcısında `MutationObserver` kullanılır, callback debounce edilir (~100 ms). |
-| Kısa ve karışık dilli başlıklar yanlış tespit edilir. | Karakter sezgisi + eşik değeri. Debug modunda gizlemek yerine **soluklaştırma ve dil etiketi** gösterilerek ayar yapılır. |
-| Elementi silmek YouTube'un kendi kodunu bozabilir. | Element **silinmez**, CSS sınıfıyla (`display:none`) gizlenir. |
+| YouTube's DOM changes often. The sidebar moved from `ytd-compact-video-renderer` to `yt-lockup-view-model`; both may coexist. | All selectors live in **one file** (`selectors.js`) and both layouts are supported. |
+| SPA navigation: no page reload. | Listen to `yt-navigate-finish` and recompute the context. |
+| YouTube **recycles** card nodes (title changes, element stays). | The decision is re-applied on every scan; detection and oEmbed results are cached, so this is cheap. |
+| Infinite scroll / lazy loading. | `MutationObserver` on `document.body` (childList + `title` attribute), debounced ~100 ms. |
+| YouTube **auto-translates** Turkish titles into the UI language, with no DOM marker. | Fetch the original title from same-origin `/oembed` when the shown title isn't Turkish. |
+| Short or mixed-language titles get misdetected. | Score + threshold; debug mode dims instead of hiding and shows the score for tuning. |
+| Removing elements can break YouTube's own code. | Elements are **never removed**, only hidden via a CSS class. |
 
-## Klasör yapısı
+## Folder layout
 ```
 yt_region_filter/
 ├── CLAUDE.md
-├── manifest.json          # MV3; izinler: "storage" + youtube.com host eşleşmesi
-├── src/                   # content script'ler manifest'teki sırayla yüklenir (aynı izole dünya)
-│   ├── selectors.js       # TÜM DOM seçicileri burada
-│   ├── detect.js          # dil tespiti: saf, senkron, DOM/chrome API'sine bağımlı değil
-│   ├── content.js         # tarama, karar, gizleme, MutationObserver, SPA gezinme, ayarlar
-│   ├── content.css        # .ytrf-hidden / .ytrf-dim / debug etiketi
+├── README.md
+├── manifest.json          # MV3; permissions: "storage" + youtube.com content-script match
+├── src/                   # content scripts load in manifest order (same isolated world)
+│   ├── selectors.js       # ALL DOM selectors live here
+│   ├── detect.js          # language detection: pure, synchronous, no DOM/chrome APIs
+│   ├── content.js         # scan, decide, hide, oEmbed lookup, observer, SPA nav, settings
+│   ├── content.css        # .ytrf-hidden / .ytrf-dim / debug label
 │   └── popup/
-│       ├── popup.html     # aç/kapa, mod (gizle/soluklaştır), gizlenen sayısı
+│       ├── popup.html     # on/off, mode (hide/dim), hidden count
 │       ├── popup.css
 │       └── popup.js
-├── tests/
-│   └── detect.test.html   # tarayıcıda açılır, detect.js'i yükleyip PASS/FAIL listeler
-└── icons/                 # (isteğe bağlı) 16/48/128 px
+└── tests/
+    └── detect.test.html   # open in a browser; loads detect.js and lists PASS/FAIL
 ```
-> Yükleme sırası: `selectors.js` → `detect.js` → `content.js`. Ortak ad alanı `globalThis.YTRF` olarak kullanılır.
+> Load order: `selectors.js` → `detect.js` → `content.js`. Shared namespace: `globalThis.YTRF`.
+>
+> C++ analogy: the manifest's `content_scripts.js` array is like concatenating the files, in order, into one translation unit. No ES modules or imports; order matters.
 
-## Sözleşme
-Ajanlar bu bölümü değiştirmez. Değişiklik gerekiyorsa raporlar, ana oturum günceller.
+## Contract
+Agents don't change this section. If a change is needed they report it and the main session updates it.
 
-### `detect.js` arayüzü
+### `detect.js` interface
 ```js
 // globalThis.YTRF.detect
-turkishScore(title: string) -> number   // 0.0–1.0, saf ve senkron, aynı girdi → aynı çıktı
+turkishScore(title: string) -> number                  // 0.0–1.0, pure, synchronous, deterministic
 isTurkish(title: string, threshold = 0.5) -> boolean   // turkishScore(title) >= threshold
 ```
-- **Neden skor + boolean:** `content.js` yalnızca `isTurkish` kullanır. Skor ise debug etiketinde gösterilir ve K7'de eşik ayarlamak için gerekir.
-- **Senkron ve saf:** MutationObserver içinde her kart için çağrılır. Bu yüzden `chrome.i18n.detectLanguage` (asenkron) bu sürümde **kullanılmaz**. Sezgi yetersiz kalırsa CLD, K7'de gri bölge (≈0.3–0.7) için asenkron ek katman olarak değerlendirilir.
-- **Sezgi:** `ı İ ğ Ğ ş Ş` güçlü sinyaldir. `ç ö ü Ç Ö Ü` zayıf sinyaldir (Almanca ve Fransızcada da geçer). Küçük bir Türkçe stopword listesi kullanılır, eşleşme **Türkçe locale ile** küçültme yapıldıktan sonra kelime bazında yapılır (`toLocaleLowerCase('tr')`). Karakter testi ise ham metin üzerinde regex ile yapılır.
-- **Kenar durumlar:** Boş veya null girdi `0` döner. Kesik başlık ("…" ile biten) normal işlenir. Emoji ve noktalama skoru etkilemez.
-- **Önbellek:** Başlık metnine göre `Map`, üst sınır ~2000 kayıt (aşılınca temizlenir).
-- **Dışa aktarım:** `globalThis.YTRF = globalThis.YTRF || {}; YTRF.detect = { turkishScore, isTurkish };`. ES modülü ve `module.exports` kullanılmaz.
+- **Why score + boolean:** `content.js` decides with `isTurkish`; the score is shown in the debug label and used for threshold tuning.
+- **Heuristic:** `ı İ ğ Ğ ş Ş` are strong signals; `ç ö ü Ç Ö Ü` are weak (also German/French). Turkish stopwords are matched per word after `toLocaleLowerCase('tr')`; the character test runs on the raw string.
+- **English proper-name exception:** if exactly one word has a strong character, there are ≥ 2 English stopwords and no Turkish stopwords, the strong-character contribution drops below the threshold ("Even Erdoğan knows: this isn't…" → not Turkish).
+- **Edge cases:** empty / null / non-string → `0`. Clipped titles are processed normally. Emoji and punctuation don't affect the score.
+- **Cache:** `Map` keyed by title, cleared at ~2000 entries.
+- **Export:** `globalThis.YTRF = globalThis.YTRF || {}; YTRF.detect = { turkishScore, isTurkish };`. No ES modules, no `module.exports`.
 
-### `chrome.storage` anahtarları
-| Anahtar | Alan | Tip / Varsayılan | Yazan | Okuyan |
+### `chrome.storage` keys
+| Key | Area | Type / default | Writer | Reader |
 |---|---|---|---|---|
 | `enabled` | `sync` | `boolean` / `true` | popup | content |
 | `mode` | `sync` | `'hide' \| 'dim'` / `'hide'` | popup | content |
-| `debug` | `sync` | `boolean` / `false` | (şimdilik elle ya da DevTools'tan) | content |
+| `debug` | `sync` | `boolean` / `false` | manual (DevTools) | content |
 | `hiddenCount` | `local` | `number` / `0` | content | popup |
 
-- `hiddenCount`: **Son aktif izleme sayfasında** gizlenen kart sayısıdır. SPA gezinmesinde `0`'a sıfırlanır. Content, yazmaları ~500 ms debounce ile yapar. `sync` yerine `local` kullanılır, çünkü `sync` alanında dakika başına yazma kotası vardır. Birden fazla YouTube sekmesi açıksa son yazan kazanır, pilotta kabul edilen bir sınırlamadır.
-- Varsayılanlar her okumada `chrome.storage.sync.get({enabled: true, mode: 'hide', debug: false})` ile verilir. Kurulumda ayrıca yazılmaz.
-- Değişiklikler `chrome.storage.onChanged` ile canlı izlenir. Popup sayacı ve content ayarları sayfa yenilemeden güncellenir.
-- Mod `dim` olduğunda gizlenen kartlar da `hiddenCount`'a sayılır.
+- `hiddenCount` is the number of cards hidden on the **last active watch page**; reset on SPA navigation; writes are debounced ~500 ms. It uses `local` because `sync` has a per-minute write quota. With several YouTube tabs open the last writer wins (accepted pilot limitation).
+- Defaults are supplied on every read via `chrome.storage.sync.get({enabled: true, mode: 'hide', debug: false})`; nothing is written on install.
+- Changes are observed live through `chrome.storage.onChanged`.
+- In `dim` mode, dimmed cards also count toward `hiddenCount`.
 
-### Dosya sahipliği
-| Dosya | Sahibi |
+### Auto-translated titles (oEmbed)
+- YouTube may auto-translate Turkish titles into the UI language, both on cards and in the watch page `h1`. There is **no** DOM marker for this (verified 2026-10-12).
+- If the shown title isn't Turkish, `content.js` calls same-origin `GET /oembed?format=json&url=…watch?v=<id>` to get the **original title** and checks it with `isTurkish`. No extra permission is needed.
+- Cache: videoId → title `Map` (max 2000). At most 3 requests in flight. On failure `''` is cached and not retried.
+- The context rule uses the same path; no decision is made until the current video's original title has arrived.
+- `selectors.js` exports: `cardTitle`, `cardChannel`, `cardVideoId`, `currentVideoId`, `watchTitle`.
+
+### File ownership
+| File | Owner |
 |---|---|
-| `CLAUDE.md`, `manifest.json` | Ana oturum (yalnızca) |
-| `src/selectors.js`, `src/content.js`, `src/content.css` | Ana oturum |
-| `src/detect.js`, `tests/detect.test.html` | Ajan A |
-| `src/popup/popup.html`, `src/popup/popup.css`, `src/popup/popup.js` | Ajan B |
+| `CLAUDE.md`, `README.md`, `manifest.json` | Main session only |
+| `src/selectors.js`, `src/content.js`, `src/content.css` | Main session |
+| `src/detect.js`, `tests/detect.test.html` | Agent A |
+| `src/popup/popup.html`, `src/popup/popup.css`, `src/popup/popup.js` | Agent B |
 
-Ajan kuralları: Ajanlar yalnızca kendi dosyalarına yazar. Başka bir dosyada değişiklik gerekiyorsa değişikliği yapmaz, raporlar. Commit atmaz. Aynı hatada 2 başarısız denemeden sonra durur ve raporlar. Bitince 3 satırlık rapor verir: ne yapıldı, nasıl test edildi, açık kalan ne.
-> C++ benzetmesi: `content_scripts.js` dizisi, dosyaların sırayla tek bir translation unit'te birleştirilmesi gibidir. ES modülü veya import yoktur, sıralama önemlidir.
+Agent rules: write only your own files; if another file needs a change, don't make it, report it. No commits. Stop after 2 failed attempts on the same error and report. Finish with a 3-line report: what was done, how it was tested, what's still open.
 
-## Kart tablosu
-| Kart | İş | Model | Durum / Bağımlılık |
+## Task cards
+| Card | Work | Model | Status / dependency |
 |---|---|---|---|
-| K0 | Yaklaşım değerlendirmesi, plan, CLAUDE.md | Opus | ✅ Bitti |
-| K1 | `manifest.json` + boş content script iskeleti (youtube.com'da console log) | Haiku | Hazır · K0 onaylandı |
-| K2 | `selectors.js`: sağ panel kartı (eski ve yeni yapı), başlık ve kanal adı çıkarma, izlenen video başlığı | Sonnet | Bekliyor · K1 + yerleşik tarayıcıda DOM incelemesi (DUR-2) |
-| K3 | `detect.js`: karakter sezgisi + stopword + önbellek, `tests/detect.test.html` | Sonnet (Ajan A) | Bekliyor · Sözleşme onayı |
-| K4 | `content.js`: observer, debounce, yeniden kullanılan düğüm, SPA gezinme, debug modu | Sonnet (Opus gözden geçirir) | Bekliyor · K2, K3 |
-| K5 | Bağlam kuralı: izlenen video Türkçeyse Türkçe öneriler gizlenmez | Sonnet | Bekliyor · K4 |
-| K6 | Popup: Sözleşme'deki storage anahtarlarına göre | Sonnet (Ajan B) | Bekliyor · Sözleşme onayı (K4'ten bağımsız) |
-| K7 | Manuel test ve eşik ayarı (gerçek kullanımda 1–2 gün) | Kullanıcı + Sonnet | Bekliyor · K5, K6 |
-| K8 | (İsteğe bağlı) A deneyi: gl/IP etkisinin ölçülmesi | Opus karar verir | Sadece B yetersizse · DUR-5 |
+| K0 | Approach evaluation, plan, CLAUDE.md | Opus | ✅ Done |
+| K1 | `manifest.json` (storage permission, popup, content-script order) | Opus (main) | ✅ Done |
+| K2 | `selectors.js`: `yt-lockup-view-model` (+ legacy `ytd-compact-video-renderer`), full title from `h3[title]`, channel, video ids, watch title | Opus (main) | ✅ Done · verified 2026-10-12 |
+| K3 | `detect.js`: character heuristic + stopwords + cache + English proper-name exception; `tests/detect.test.html` | Sonnet (Agent A) | ✅ Done · all tests pass (headless Chrome) |
+| K4 | `content.js`: observer, debounce, recycled nodes, SPA navigation, debug mode | Opus (main) | ✅ Done |
+| K5 | Context rule: Turkish suggestions stay when the current video is Turkish | Opus (main) | ✅ Done |
+| K5b | Auto-translated Turkish titles: original title via oEmbed (cards + context) | Opus (main) | ✅ Done · verified by user on a translated card |
+| K6 | Popup per the storage contract | Sonnet (Agent B) | ✅ Done |
+| K7 | Real-world use and threshold tuning (1–2 days) | User + Sonnet | **Next** |
+| K8 | (Optional) A experiment: measure gl/IP effect | Opus decides | Only if B is insufficient · STOP-5 |
 
-## DUR noktaları (kullanıcı onayı gerekir)
-- **DUR-1:** K1 sonrası: extension "paketlenmemiş" yüklendi ve YouTube sekmesi konsolunda log görüldü mü?
-- **DUR-2:** K2 öncesi: seçiciler tahminle yazılmaz. Önce yerleşik tarayıcıda (oturum açmadan) DOM incelenir ve bulunan seçiciler kullanıcıya özetlenir. İnceleme yetersiz kalırsa kullanıcıdan bir kartın `outerHTML`'i istenir (DevTools → sağ tık → Copy → Copy outerHTML).
-- **DUR-3:** `storage` dışında **herhangi bir yeni izin**, MAIN world enjeksiyonu, ağ isteği yakalama veya `declarativeNetRequest` eklenmeden önce.
-- **DUR-4:** K4 sonrası: debug modunda (soluklaştırma + etiket) yanlış pozitifler ve negatifler birlikte gözden geçirilir. Ardından varsayılan mod seçilir.
-- **DUR-5:** K8 (A yaklaşımı) başlatılmadan önce.
-- **DUR-6:** Kapsam genişletilmeden önce (ana sayfa, Shorts, arama sonuçları, video sonu ekranı).
+## STOP points (user approval required)
+- **STOP-1:** ✅ (2026-10-12) Extension loaded unpacked, log visible in the YouTube tab console.
+- **STOP-2:** ✅ (2026-10-12) Selectors verified on a real page; user confirmed hiding, context rule, counter and the translated-title case.
+- **STOP-3:** Before adding **any permission** beyond `storage`, MAIN-world injection, request interception, or `declarativeNetRequest`.
+- **STOP-4:** After K7: review false positives / negatives in debug mode before changing thresholds or defaults.
+- **STOP-5:** Before starting K8 (approach A).
+- **STOP-6:** Before widening the scope (homepage, Shorts, search, end screen).
 
-## Çalışma kuralları
-- **Aynı hatada 2 denemeden sonra DUR.** Denenenleri, gözlenen davranışı ve hipotezleri kısaca özetle, **Opus'a dönülmesini öner**. Körlemesine üçüncü bir deneme yapma.
-- Seçiciler yalnızca `selectors.js` içinde tutulur. Başka dosyada sabit seçici yazılmaz.
-- Framework, npm ve build adımı kullanılmaz. Düz JS (ES2020+), Chrome'un en son sürümü hedeflenir.
-- Elementler silinmez, yalnızca sınıf eklenip kaldırılır.
-- Loglar `[ytrf]` önekiyle yazılır ve ayarlardaki `debug` bayrağına bağlıdır.
-- Kod Türkçe yorum içerebilir, tanımlayıcılar İngilizce yazılır.
+## Working rules
+- **Stop after 2 failed attempts on the same error.** Summarize what was tried, what was observed, and the hypotheses, and **suggest handing back to Opus**. No blind third attempt.
+- Selectors live only in `selectors.js`; no hard-coded selectors elsewhere.
+- No framework, npm, or build step. Plain JS (ES2020+), targeting current Chrome.
+- Never remove elements; only add/remove classes.
+- Logs use the `[ytrf]` prefix; verbose logs are gated by the `debug` setting.
+- Everything in the repo is written in English (comments, docs, UI strings, logs). Turkish appears only as data (stopwords, test inputs).
 
-## Test yöntemi
-1. `chrome://extensions` adresini aç → sağ üstte **Geliştirici modu**nu aç.
-2. **Paketlenmemiş öğe yükle** → bu klasörü (`manifest.json`'un bulunduğu kök) seç.
-3. Kod değişince extension kartındaki **↻ (yeniden yükle)** düğmesine bas, ardından **YouTube sekmesini yenile** (content script'ler ancak sayfa yenilenince yeniden enjekte edilir).
-4. Loglar: YouTube sekmesinde DevTools → Console. Gerekirse bağlam açılır listesinden extension'ın izole dünyasını seç. Popup logları için popup'a sağ tıkla → İncele.
-5. Hatalar: `chrome://extensions` → extension kartı → **Hatalar** düğmesi.
+## Testing
+1. Open `chrome://extensions` → enable **Developer mode** (top right).
+2. **Load unpacked** → select this folder (the root containing `manifest.json`).
+3. After code changes, click **↻ (reload)** on the extension card, then **reload the YouTube tab** (content scripts are only re-injected on page load).
+4. Logs: YouTube tab → DevTools → Console. Popup logs: right-click the popup → Inspect.
+5. Errors: `chrome://extensions` → extension card → **Errors**.
+6. Debug mode: right-click the popup → Inspect → Console → `chrome.storage.sync.set({debug: true})` (`false` to turn off).
+7. `detect.js` unit tests: open `tests/detect.test.html` in Chrome and check the green summary bar. From the command line (no Node needed):
+   `"C:\Program Files\Google\Chrome\Application\chrome.exe" --headless=new --user-data-dir=<temp dir> --dump-dom file:///D:/development/yt_region_filter/tests/detect.test.html` → look for `ALL PASSED`.
 
-**Senaryo kontrol listesi:**
-- [ ] İngilizce bir video izlenirken sağ paneldeki Türkçe öneriler gizleniyor.
-- [ ] Türkçe bir video izlenirken Türkçe öneriler görünüyor (bağlam kuralı).
-- [ ] Panel aşağı kaydırılınca yeni yüklenen kartlar da filtreleniyor.
-- [ ] Videodan videoya (SPA) geçince bağlam güncelleniyor, eski karar takılı kalmıyor.
-- [ ] Extension kapatılınca (popup) tüm kartlar geri geliyor.
-- [ ] Debug modunda her kartta tespit edilen dil etiketi görünüyor.
+**Known limitations (watch during K7):**
+- Turkish titles with no special characters and only one stopword (e.g. "bugün hava çok güzel" = 0.35) slip through.
+- Short English titles with a Turkish name and fewer than 2 English stopwords ("Erdoğan meets Biden in Washington") still count as Turkish.
+- A translated Turkish card can be briefly visible until its oEmbed response arrives.
+- All-ASCII uppercase Turkish ("ILK KEZ") doesn't match the stopword list.
+
+**Scenario checklist:**
+- [x] Watching an English video: Turkish suggestions in the sidebar are hidden.
+- [x] Watching a Turkish video: Turkish suggestions are shown (context rule).
+- [x] Scrolling the sidebar: newly loaded cards are filtered too.
+- [x] Auto-translated Turkish titles are caught via oEmbed.
+- [ ] Video-to-video (SPA) navigation updates the context; no stale decisions.
+- [ ] Turning the filter off in the popup restores all cards.
+- [x] Debug mode shows a score label on each card.

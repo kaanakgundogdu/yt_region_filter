@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YT Region Filter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <h1>YT Region Filter</h1>
+
+    <div class="row">
+      <label for="enabled" class="row-label">Filter enabled</label>
+      <label class="switch">
+        <input type="checkbox" id="enabled" role="switch">
+        <span class="slider" aria-hidden="true"></span>
+      </label>
+    </div>
+
+    <fieldset id="modeGroup">
+      <legend>Mode</legend>
+      <div class="segmented">
+        <input type="radio" name="mode" id="mode-hide" value="hide">
+        <label for="mode-hide">Hide</label>
+        <input type="radio" name="mode" id="mode-dim" value="dim">
+        <label for="mode-dim">Dim</label>
+      </div>
+    </fieldset>
+
+    <div class="counter" aria-live="polite">
+      Hidden on this page: <strong id="count">0</strong>
+    </div>
+    <p class="note">Applies to the last active watch page.</p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

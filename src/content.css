@@ -1,0 +1,35 @@
+.ytrf-hidden {
+  display: none !important;
+}
+
+.ytrf-dim {
+  opacity: 0.25 !important;
+  transition: opacity 0.15s;
+}
+
+.ytrf-dim:hover {
+  opacity: 0.8 !important;
+}
+
+/* Debug label: score and decision on top of the card */
+.ytrf-debug {
+  position: relative !important;
+}
+
+.ytrf-debug::before {
+  content: attr(data-ytrf-label);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  z-index: 10;
+  padding: 1px 4px;
+  font: 11px/1.3 monospace;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.ytrf-debug[data-ytrf-tr="1"]::before {
+  background: rgba(200, 30, 30, 0.85);
+}
