@@ -65,8 +65,9 @@ yt_region_filter/
 │       ├── popup.html     # on/off, mode (hide/dim), hidden count
 │       ├── popup.css
 │       └── popup.js
-└── tests/
-    └── detect.test.html   # open in a browser; loads detect.js and lists PASS/FAIL
+├── tests/
+│   └── detect.test.html   # open in a browser; loads detect.js and lists PASS/FAIL
+└── icons/                 # icon.svg (source) + 16/32/48/128 PNGs rendered with headless Chrome
 ```
 > Load order: `selectors.js` → `detect.js` → `content.js`. Shared namespace: `globalThis.YTRF`.
 >

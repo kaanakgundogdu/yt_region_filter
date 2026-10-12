@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Red octagon (stop-sign shape, like ad blockers) with a white "RB" (Region Block) -->
+  <polygon points="37.5,4 90.5,4 124,37.5 124,90.5 90.5,124 37.5,124 4,90.5 4,37.5"
+           fill="#d32f2f" stroke="#ffffff" stroke-width="6" stroke-linejoin="round"/>
+  <text x="64" y="66" text-anchor="middle" dominant-baseline="central"
+        font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900"
+        font-size="58" letter-spacing="-2" fill="#ffffff">RB</text>
+</svg>
