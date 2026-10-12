@@ -12,7 +12,10 @@
 }
 
 /* Debug label: score and decision on top of the card */
-.ytrf-debug {
+/* Only sidebar cards need a positioning context for the label. Player tiles are already positioned
+   (end-screen wall tiles are absolute; forcing relative would collapse that layout). */
+yt-lockup-view-model.ytrf-debug,
+ytd-compact-video-renderer.ytrf-debug {
   position: relative !important;
 }
 
