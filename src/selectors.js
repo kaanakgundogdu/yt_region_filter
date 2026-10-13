@@ -11,9 +11,6 @@
     // Cards: new lockup layout + legacy renderer (fallback).
     card: 'yt-lockup-view-model, ytd-compact-video-renderer',
 
-    // Title of the video being watched.
-    watchTitle: 'ytd-watch-metadata h1 yt-formatted-string, ytd-watch-metadata h1',
-
     // Player suggestion tiles (verified 2026-10-12), pre-rendered and recycled (href/text change in place):
     //  - .ytp-fullscreen-grid: the suggestions grid opened while watching in fullscreen and shown at
     //    the end of the video (modern tiles, CSS grid, so hidden tiles reflow);
@@ -78,20 +75,9 @@
     return idFromHref(upnext.querySelector('a.ytp-autonav-endscreen-link-container'));
   }
 
-  function currentVideoId() {
-    return new URLSearchParams(location.search).get('v') || '';
-  }
-
-  // Note: the h1 shows the auto-translated title; content.js fetches the original via oEmbed.
-  function watchTitle() {
-    const el = document.querySelector(S.watchTitle);
-    if (!el) return '';
-    return (el.getAttribute('title') || el.textContent || '').trim();
-  }
-
   globalThis.YTRF = globalThis.YTRF || {};
   YTRF.sel = {
-    S, cardTitle, cardChannel, cardVideoId, currentVideoId, watchTitle,
+    S, cardTitle, cardChannel, cardVideoId,
     stillTitle, stillVideoId, upnextTitle, upnextVideoId,
   };
 })();

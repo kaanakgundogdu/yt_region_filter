@@ -1,6 +1,6 @@
 # YT Region Filter
 
-A tiny Chrome extension (Manifest V3, plain JavaScript, no build step) that hides **off-context Turkish recommendations** on YouTube's watch page: the "Up next" sidebar, the fullscreen and end-screen suggestion grids, and autoplay.
+A tiny Chrome extension (Manifest V3, plain JavaScript, no build step) that hides **Turkish recommendations** on YouTube's watch page: the "Up next" sidebar, the fullscreen and end-screen suggestion grids, and autoplay.
 
 ## Why
 
@@ -9,18 +9,18 @@ YouTube's recommendation engine leans heavily on your **IP location**, not on yo
 Recommendations *related* to the video are useful, so this extension doesn't blanket-ban a language. Instead it:
 
 - **hides Turkish cards in the sidebar, the fullscreen suggestion grid and the end screen** when the video you're watching is **not** Turkish;
-- **cancels autoplay** when the "Up next" video is Turkish and off-context, so it doesn't start on its own;
-- **leaves everything alone** when you're watching a Turkish video (context rule);
+- **cancels autoplay** when the "Up next" video is Turkish, so it doesn't start on its own;
+- does this **on every video, Turkish ones included**: even under Turkish videos the regional suggestions turned out to be mostly unrelated political content;
 - **sees through auto-translated titles**: YouTube now translates titles into your UI language, so a Turkish video can show up as *"Veteran Journalist Calls for Early Elections!…"*. The extension looks up the original title and catches it anyway.
 
 ## How it works
 
 ```
-sidebar card ──► shown title ──► Turkish? ──yes──► hide (unless current video is Turkish)
+sidebar card ──► shown title ──► Turkish? ──yes──► hide
                                      │
                                      no
                                      ▼
-                     original title via /oembed ──► Turkish? ──yes──► hide (unless current video is Turkish)
+                     original title via /oembed ──► Turkish? ──yes──► hide
 ```
 
 1. **Detection** ([`src/detect.js`](src/detect.js)) is a small, synchronous, deterministic heuristic that returns a 0–1 score:

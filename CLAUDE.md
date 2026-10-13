@@ -4,12 +4,12 @@ A small pilot extension that hides **regional (Turkish) recommendations** that a
 
 ## Problem statement
 - Homepage recommendations are already turned off (watch history off). The problem is Turkey-sourced, mostly political, videos in the **watch-page sidebar**.
-- Recommendations related to the current video are useful and must stay. Only **off-context regional** ones should go.
+- Recommendations related to the current video are useful and must stay. Only **off-context regional** ones should go. (Revised 2026-10-13: Turkish suggestions turned out to be mostly unrelated political content even under Turkish videos, so all Turkish suggestions are filtered; see decision 3.)
 
 ## Decisions (approved 2026-10-12)
 1. **Approach:** Adapted B (see below); A is dropped. The account region is already set to a non-Turkish country and Turkish suggestions still appear, which confirms the signal comes from IP/account, not `gl`.
 2. **Scope:** The watch-page sidebar (the same list that moves below the video on narrow layouts) and, since 2026-10-12 (STOP-6 approved by the user), the end screen: the suggestion grid and the autoplay "Up next" countdown. Homepage, Shorts and search stay out of scope.
-3. **Context rule:** On. If the current video is Turkish, Turkish suggestions are shown.
+3. **Context rule:** ~~On~~ **Removed 2026-10-13** at the user's request. Turkish suggestions are filtered on every video, including Turkish ones.
 4. **Mode:** Default **hide**. Debug mode (dim + score label) is for development and tuning.
 5. **Target language:** Turkish only. No channel allowlist in the pilot.
 6. **Popup:** Minimal (on/off, mode, hidden count).
@@ -29,7 +29,7 @@ A small pilot extension that hides **regional (Turkish) recommendations** that a
 
 **B) Card-title language detection + hiding: CHOSEN, with two changes:**
 1. **Target the watch page, not the homepage** (homepage is already off).
-2. **Context rule:** if the current video's title is also Turkish, Turkish suggestions are **not** hidden, so "related suggestions are useful" holds.
+2. ~~**Context rule:** if the current video's title is also Turkish, Turkish suggestions are not hidden.~~ Removed 2026-10-13 (decision 3).
 
 Detection is a cheap synchronous heuristic: **Turkish-specific characters** (`ı İ ğ Ğ ş Ş`) plus a small Turkish stopword list. `chrome.i18n.detectLanguage` (CLD) is unreliable on short titles and async, so it isn't used.
 
@@ -43,9 +43,9 @@ Detection is a cheap synchronous heuristic: **Turkish-specific characters** (`ı
 | Risk | Mitigation |
 |---|---|
 | YouTube's DOM changes often. The sidebar moved from `ytd-compact-video-renderer` to `yt-lockup-view-model`; both may coexist. | All selectors live in **one file** (`selectors.js`) and both layouts are supported. |
-| SPA navigation: no page reload. | Listen to `yt-navigate-finish` and recompute the context. |
+| SPA navigation: no page reload. | Listen to `yt-navigate-finish`, reset the counter and rescan. |
 | End-screen tiles are pre-rendered in the player and recycled (`href` and text change in place). | Observe the `href` attribute too, and rescan on the video's `ended` event (capture phase, since media events don't bubble). |
-| Hiding the autoplay "Up next" overlay doesn't stop autoplay. | If the next video is Turkish and off-context, click YouTube's own **Cancel** button once the countdown is visible (once per video id). |
+| Hiding the autoplay "Up next" overlay doesn't stop autoplay. | If the next video is Turkish, click YouTube's own **Cancel** button once the countdown is visible (once per video id). |
 | YouTube **recycles** card nodes (title changes, element stays). | The decision is re-applied on every scan; detection and oEmbed results are cached, so this is cheap. |
 | Infinite scroll / lazy loading. | `MutationObserver` on `document.body` (childList + `title` attribute), debounced ~100 ms. |
 | YouTube **auto-translates** Turkish titles into the UI language, with no DOM marker. | Fetch the original title from same-origin `/oembed` when the shown title isn't Turkish. |
@@ -109,8 +109,7 @@ isTurkish(title: string, threshold = 0.5) -> boolean   // turkishScore(title) >=
 - YouTube may auto-translate Turkish titles into the UI language, both on cards and in the watch page `h1`. There is **no** DOM marker for this (verified 2026-10-12).
 - If the shown title isn't Turkish, `content.js` calls same-origin `GET /oembed?format=json&url=…watch?v=<id>` to get the **original title** and checks it with `isTurkish`. No extra permission is needed.
 - Cache: videoId → title `Map` (max 2000). At most 3 requests in flight. On failure `''` is cached and not retried.
-- The context rule uses the same path; no decision is made until the current video's original title has arrived.
-- `selectors.js` exports: `cardTitle`, `cardChannel`, `cardVideoId`, `currentVideoId`, `watchTitle`, `stillTitle`, `stillVideoId`, `upnextTitle`, `upnextVideoId`.
+- `selectors.js` exports: `cardTitle`, `cardChannel`, `cardVideoId`, `stillTitle`, `stillVideoId`, `upnextTitle`, `upnextVideoId`.
 
 ### End screen
 - Grid tiles: `#movie_player .ytp-modern-videowall-still` (legacy `.ytp-videowall-still`). The same modern tiles make up `.ytp-fullscreen-grid`, the suggestion grid you can open while watching in **fullscreen**, so one selector covers both. Each tile is an `<a>` whose `href` holds the video id; title in `.ytp-modern-videowall-still-info-title`. Hidden/dimmed exactly like sidebar cards and counted in `hiddenCount`.
@@ -134,8 +133,8 @@ Agent rules: write only your own files; if another file needs a change, don't ma
 | K2 | `selectors.js`: `yt-lockup-view-model` (+ legacy `ytd-compact-video-renderer`), full title from `h3[title]`, channel, video ids, watch title | Opus (main) | ✅ Done · verified 2026-10-12 |
 | K3 | `detect.js`: character heuristic + stopwords + cache + English proper-name exception; `tests/detect.test.html` | Sonnet (Agent A) | ✅ Done · all tests pass (headless Chrome) |
 | K4 | `content.js`: observer, debounce, recycled nodes, SPA navigation, debug mode | Opus (main) | ✅ Done |
-| K5 | Context rule: Turkish suggestions stay when the current video is Turkish | Opus (main) | ✅ Done |
-| K5b | Auto-translated Turkish titles: original title via oEmbed (cards + context) | Opus (main) | ✅ Done · verified by user on a translated card |
+| K5 | Context rule: Turkish suggestions stay when the current video is Turkish | Opus (main) | ❌ Removed 2026-10-13 (user request) |
+| K5b | Auto-translated Turkish titles: original title via oEmbed | Opus (main) | ✅ Done · verified by user on a translated card |
 | K6 | Popup per the storage contract | Sonnet (Agent B) | ✅ Done |
 | K7 | Real-world use and threshold tuning (1–2 days) | User + Sonnet | **Next** |
 | K9 | End screen: hide Turkish grid tiles, cancel Turkish autoplay | Opus (main) | ✅ Written · selectors verified on a real page 2026-10-12 · user test pending |
@@ -177,10 +176,10 @@ Agent rules: write only your own files; if another file needs a change, don't ma
 
 **Scenario checklist:**
 - [x] Watching an English video: Turkish suggestions in the sidebar are hidden.
-- [x] Watching a Turkish video: Turkish suggestions are shown (context rule).
+- [ ] Watching a Turkish video: Turkish suggestions are hidden too.
 - [x] Scrolling the sidebar: newly loaded cards are filtered too.
 - [x] Auto-translated Turkish titles are caught via oEmbed.
-- [ ] Video-to-video (SPA) navigation updates the context; no stale decisions.
+- [ ] Video-to-video (SPA) navigation: counter resets, no stale decisions.
 - [ ] Turning the filter off in the popup restores all cards.
 - [ ] End screen: Turkish tiles hidden after an English video ends.
 - [ ] Fullscreen: Turkish tiles hidden in the suggestion grid opened during fullscreen playback.

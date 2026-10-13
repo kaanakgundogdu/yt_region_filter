@@ -1,4 +1,4 @@
-// Scans the watch-page sidebar and hides/dims off-context Turkish recommendations.
+// Scans the watch page (sidebar, player grids, autoplay) and hides/dims Turkish recommendations.
 // Dependencies (manifest load order): YTRF.sel (selectors.js), YTRF.detect (detect.js).
 (() => {
   'use strict';
@@ -116,51 +116,47 @@
       return;
     }
 
-    // Context rule: if the current video is Turkish (even if translated), Turkish suggestions stay.
-    // Wait for the original title before deciding, to avoid hiding and then un-hiding.
-    const ctx = judge(sel.watchTitle(), sel.currentVideoId());
-    if (ctx.src === '…') return;
-    const contextTr = ctx.tr;
+    // Turkish suggestions are filtered on every video, Turkish ones included: on Turkish videos
+    // they were still mostly unrelated political content (context rule removed 2026-10-13).
     let count = 0;
 
     for (const [el, title, id] of targets()) {
       // YouTube recycles nodes, so re-apply the decision on every scan (results are cached).
       const { tr, score, src } = judge(title, id);
-      const filter = tr && !contextTr;
 
       el.classList.remove(...CLASSES);
-      if (filter) {
+      if (tr) {
         el.classList.add(settings.mode === 'dim' ? 'ytrf-dim' : 'ytrf-hidden');
         count++;
       }
       if (settings.debug) {
         el.classList.add('ytrf-debug');
         el.dataset.ytrfTr = tr ? '1' : '0';
-        el.dataset.ytrfLabel = `${score.toFixed(2)}${src}${filter ? ' hidden' : ''}${contextTr ? ' (context TR)' : ''}`;
+        el.dataset.ytrfLabel = `${score.toFixed(2)}${src}${tr ? ' hidden' : ''}`;
       }
     }
 
-    checkAutoplay(contextTr);
+    checkAutoplay();
 
     if (count !== lastCount) {
       lastCount = count;
-      log('hidden:', count, 'context TR:', contextTr);
+      log('hidden:', count);
       clearTimeout(countTimer);
       countTimer = setTimeout(() => saveCount(count), 500);
     }
   }
 
-  // Hiding the "Up next" overlay wouldn't stop autoplay, so cancel the countdown instead.
+  // Hiding the "Up next" overlay wouldn't stop autoplay, so cancel the countdown if the next video is Turkish.
   // The overlay is pre-rendered while the video plays; judging it early warms the oEmbed cache,
   // but we only click Cancel once it is actually visible (i.e. the countdown is running).
   let cancelledFor = '';
-  function checkAutoplay(contextTr) {
+  function checkAutoplay() {
     const upnext = document.querySelector(sel.S.upnext);
     if (!upnext) return;
     const id = sel.upnextVideoId(upnext);
     if (!id || id === cancelledFor) return;
     const { tr } = judge(sel.upnextTitle(upnext), id);
-    if (!tr || contextTr || upnext.getClientRects().length === 0) return;
+    if (!tr || upnext.getClientRects().length === 0) return;
     const cancel = document.querySelector(sel.S.upnextCancel);
     if (!cancel) return;
     cancel.click();
@@ -200,7 +196,7 @@
   }
   document.addEventListener('ended', onEnded, true);
 
-  // SPA navigation: reset the counter and recompute the context.
+  // SPA navigation: reset the counter and rescan.
   function onNavigate() {
     lastCount = -1;
     schedule();
