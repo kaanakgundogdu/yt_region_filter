@@ -17,6 +17,9 @@
     //  - .ytp-endscreen-content: legacy end-screen wall (absolutely positioned, hidden tiles leave gaps).
     endscreenStill: '#movie_player .ytp-modern-videowall-still, #movie_player .ytp-videowall-still',
 
+    // Search results page (verified 2026-10-14): regular results and Shorts tiles in shelves.
+    searchResult: 'ytd-search ytd-video-renderer, ytd-search yt-lockup-view-model, ytd-search ytm-shorts-lockup-view-model',
+
     // Autoplay "Up next" countdown overlay and its cancel button.
     upnext: '#movie_player .ytp-autonav-endscreen-upnext-container',
     upnextCancel: '#movie_player .ytp-autonav-endscreen-upnext-cancel-button',
@@ -26,7 +29,8 @@
   function cardTitle(card) {
     const el =
       card.querySelector('h3[title]') ||           // new layout
-      card.querySelector('#video-title[title]') ||  // legacy layout
+      card.querySelector('#video-title[title]') ||  // legacy layout, search results
+      card.querySelector('h3 a[title]') ||          // Shorts tiles
       card.querySelector('#video-title');
     if (!el) return '';
     return (el.getAttribute('title') || el.textContent || '').trim();
@@ -40,13 +44,14 @@
     return el ? el.textContent.trim() : '';
   }
 
-  // Video id: the host div's "content-id-XXXX" class in the new layout, otherwise the watch link.
+  // Video id: the host div's "content-id-XXXX" class in the new layout, otherwise the watch or
+  // Shorts link.
   function cardVideoId(card) {
     const host = card.querySelector('[class*="content-id-"]');
     const m = host && host.className.match(/content-id-([\w-]{11})/);
     if (m) return m[1];
-    const a = card.querySelector('a[href*="/watch?v="]');
-    const h = a && a.getAttribute('href').match(/[?&]v=([\w-]{11})/);
+    const a = card.querySelector('a[href*="/watch?v="], a[href*="/shorts/"]');
+    const h = a && a.getAttribute('href').match(/(?:[?&]v=|\/shorts\/)([\w-]{11})/);
     return h ? h[1] : '';
   }
 
@@ -75,9 +80,14 @@
     return idFromHref(upnext.querySelector('a.ytp-autonav-endscreen-link-container'));
   }
 
+  // The search query from the results page URL ('' elsewhere).
+  function searchQuery() {
+    return location.pathname === '/results' ? new URLSearchParams(location.search).get('search_query') || '' : '';
+  }
+
   globalThis.YTRF = globalThis.YTRF || {};
   YTRF.sel = {
-    S, cardTitle, cardChannel, cardVideoId,
+    S, cardTitle, cardChannel, cardVideoId, searchQuery,
     stillTitle, stillVideoId, upnextTitle, upnextVideoId,
   };
 })();

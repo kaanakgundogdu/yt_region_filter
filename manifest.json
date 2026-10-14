@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "YT Region Filter",
   "version": "0.1.0",
-  "description": "Hides Turkish (regional) recommendations on the YouTube watch page: sidebar, player grids and autoplay.",
+  "description": "Hides Turkish (regional) recommendations on YouTube: watch-page sidebar, player grids, autoplay and search results.",
   "permissions": ["storage"],
   "icons": {
     "16": "icons/icon16.png",

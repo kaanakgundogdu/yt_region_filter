@@ -1,4 +1,4 @@
-// Scans the watch page (sidebar, player grids, autoplay) and hides/dims Turkish recommendations.
+// Scans the watch page (sidebar, player grids, autoplay) and search results, and hides/dims Turkish videos.
 // Dependencies (manifest load order): YTRF.sel (selectors.js), YTRF.detect (detect.js).
 (() => {
   'use strict';
@@ -96,9 +96,12 @@
     return { tr: false, score: shown, src: '' };
   }
 
-  // Every element we filter: sidebar cards and end-screen tiles, with how to read their title/id.
+  // Every element we filter (sidebar cards, player tiles, search results), with how to read its title/id.
   function targets() {
     const out = [];
+    for (const el of document.querySelectorAll(sel.S.searchResult)) {
+      out.push([el, sel.cardTitle(el), sel.cardVideoId(el), 'search']);
+    }
     const sidebar = document.querySelector(sel.S.sidebar);
     if (sidebar) {
       for (const el of sidebar.querySelectorAll(sel.S.card)) out.push([el, sel.cardTitle(el), sel.cardVideoId(el)]);
@@ -110,7 +113,7 @@
   }
 
   function scan() {
-    if (location.pathname !== '/watch') return;
+    if (location.pathname !== '/watch' && location.pathname !== '/results') return;
     if (!settings.enabled) {
       clearAll();
       return;
@@ -118,9 +121,17 @@
 
     // Turkish suggestions are filtered on every video, Turkish ones included: on Turkish videos
     // they were still mostly unrelated political content (context rule removed 2026-10-13).
+    // Searching in Turkish means Turkish results are wanted. Queries are short, so any Turkish
+    // letter (including ç ö ü) counts, not just a full isTurkish() score.
+    const query = sel.searchQuery();
+    const turkishQuery = /[ıİğĞşŞçÇöÖüÜ]/.test(query) || detect.isTurkish(query);
     let count = 0;
 
-    for (const [el, title, id] of targets()) {
+    for (const [el, title, id, kind] of targets()) {
+      if (kind === 'search' && turkishQuery) {
+        el.classList.remove(...CLASSES);
+        continue;
+      }
       // YouTube recycles nodes, so re-apply the decision on every scan (results are cached).
       const { tr, score, src } = judge(title, id);
 

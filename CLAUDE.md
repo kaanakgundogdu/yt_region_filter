@@ -8,7 +8,7 @@ A small pilot extension that hides **regional (Turkish) recommendations** that a
 
 ## Decisions (approved 2026-10-12)
 1. **Approach:** Adapted B (see below); A is dropped. The account region is already set to a non-Turkish country and Turkish suggestions still appear, which confirms the signal comes from IP/account, not `gl`.
-2. **Scope:** The watch-page sidebar (the same list that moves below the video on narrow layouts) and, since 2026-10-12 (STOP-6 approved by the user), the end screen: the suggestion grid and the autoplay "Up next" countdown. Homepage, Shorts and search stay out of scope.
+2. **Scope:** The watch-page sidebar (the same list that moves below the video on narrow layouts) and, since 2026-10-12 (STOP-6 approved by the user), the end screen: the suggestion grid and the autoplay "Up next" countdown. Since 2026-10-14 also **search results** (regular results and Shorts tiles), except when the query itself is Turkish. Homepage and the Shorts feed stay out of scope.
 3. **Context rule:** ~~On~~ **Removed 2026-10-13** at the user's request. Turkish suggestions are filtered on every video, including Turkish ones.
 4. **Mode:** Default **hide**. Debug mode (dim + score label) is for development and tuning.
 5. **Target language:** Turkish only. No channel allowlist in the pilot.
@@ -109,11 +109,15 @@ isTurkish(title: string, threshold = 0.5) -> boolean   // turkishScore(title) >=
 - YouTube may auto-translate Turkish titles into the UI language, both on cards and in the watch page `h1`. There is **no** DOM marker for this (verified 2026-10-12).
 - If the shown title isn't Turkish, `content.js` calls same-origin `GET /oembed?format=json&url=…watch?v=<id>` to get the **original title** and checks it with `isTurkish`. No extra permission is needed.
 - Cache: videoId → title `Map` (max 2000). At most 3 requests in flight. On failure `''` is cached and not retried.
-- `selectors.js` exports: `cardTitle`, `cardChannel`, `cardVideoId`, `stillTitle`, `stillVideoId`, `upnextTitle`, `upnextVideoId`.
+- `selectors.js` exports: `cardTitle`, `cardChannel`, `cardVideoId`, `searchQuery`, `stillTitle`, `stillVideoId`, `upnextTitle`, `upnextVideoId`.
 
 ### End screen
 - Grid tiles: `#movie_player .ytp-modern-videowall-still` (legacy `.ytp-videowall-still`). The same modern tiles make up `.ytp-fullscreen-grid`, the suggestion grid you can open while watching in **fullscreen**, so one selector covers both. Each tile is an `<a>` whose `href` holds the video id; title in `.ytp-modern-videowall-still-info-title`. Hidden/dimmed exactly like sidebar cards and counted in `hiddenCount`.
 - Autoplay: `.ytp-autonav-endscreen-upnext-container` (title `.ytp-autonav-endscreen-upnext-title`, link `a.ytp-autonav-endscreen-link-container`). The overlay is pre-rendered while the video plays, so it is judged early (warms the oEmbed cache), but `.ytp-autonav-endscreen-upnext-cancel-button` is clicked only when the overlay is visible.
+
+### Search results
+- Items: `ytd-search ytd-video-renderer` (title in `#video-title[title]`), `yt-lockup-view-model`, and Shorts tiles `ytm-shorts-lockup-view-model` (title in `h3 a[title]`, id from `/shorts/<id>`). Verified 2026-10-14; `cardTitle`/`cardVideoId` handle all three, and oEmbed works for Shorts ids.
+- **Turkish-query exception:** if the `search_query` URL parameter contains any Turkish letter (`ı İ ğ Ğ ş Ş ç Ç ö Ö ü Ü`) or `isTurkish(query)` is true, search results are left alone. Queries are short, so even weak letters count.
 
 ### File ownership
 | File | Owner |
@@ -138,6 +142,7 @@ Agent rules: write only your own files; if another file needs a change, don't ma
 | K6 | Popup per the storage contract | Sonnet (Agent B) | ✅ Done |
 | K7 | Real-world use and threshold tuning (1–2 days) | User + Sonnet | **Next** |
 | K9 | End screen: hide Turkish grid tiles, cancel Turkish autoplay | Opus (main) | ✅ Written · selectors verified on a real page 2026-10-12 · user test pending |
+| K10 | Search results: hide Turkish results and Shorts unless the query is Turkish | Opus (main) | ✅ Written · selectors verified on a real page 2026-10-14 · user test pending |
 | K8 | (Optional) A experiment: measure gl/IP effect | Opus decides | Only if B is insufficient · STOP-5 |
 
 ## STOP points (user approval required)
@@ -146,7 +151,7 @@ Agent rules: write only your own files; if another file needs a change, don't ma
 - **STOP-3:** Before adding **any permission** beyond `storage`, MAIN-world injection, request interception, or `declarativeNetRequest`.
 - **STOP-4:** After K7: review false positives / negatives in debug mode before changing thresholds or defaults.
 - **STOP-5:** Before starting K8 (approach A).
-- **STOP-6:** Before widening the scope further (homepage, Shorts, search). End screen: ✅ approved 2026-10-12.
+- **STOP-6:** Before widening the scope further (homepage, Shorts feed). End screen: ✅ approved 2026-10-12. Search results: ✅ approved 2026-10-14.
 
 ## Working rules
 - **Stop after 2 failed attempts on the same error.** Summarize what was tried, what was observed, and the hypotheses, and **suggest handing back to Opus**. No blind third attempt.
@@ -173,6 +178,7 @@ Agent rules: write only your own files; if another file needs a change, don't ma
 - Short English titles with a Turkish name and fewer than 2 English stopwords ("Erdoğan meets Biden in Washington") still count as Turkish.
 - A translated Turkish card can be briefly visible until its oEmbed response arrives.
 - All-ASCII uppercase Turkish ("ILK KEZ") doesn't match the stopword list.
+- A Turkish query typed without Turkish letters ("turkiye ekonomi") is treated as non-Turkish, so Turkish results get hidden.
 
 **Scenario checklist:**
 - [x] Watching an English video: Turkish suggestions in the sidebar are hidden.
@@ -184,4 +190,6 @@ Agent rules: write only your own files; if another file needs a change, don't ma
 - [ ] End screen: Turkish tiles hidden after an English video ends.
 - [ ] Fullscreen: Turkish tiles hidden in the suggestion grid opened during fullscreen playback.
 - [ ] Autoplay: a Turkish "Up next" countdown is cancelled; an English one still autoplays.
+- [ ] Search (English query): Turkish results and Shorts are hidden.
+- [ ] Search (Turkish query): Turkish results are shown.
 - [x] Debug mode shows a score label on each card.
